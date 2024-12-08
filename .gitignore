@@ -1,0 +1,11 @@
+
+*
+!.gitignore
+!README.md
+!src/
+!cogs/
+!assets/
+
+!*.py
+
+*test*.py
