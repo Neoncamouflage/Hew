@@ -25,25 +25,36 @@ class MusicPlayerView(View):
         self.thumbPick = random.choice(music_opts['thumb_images'])
         self.station = random.choice(music_opts['names'])
         self.requests = {}
+        self.prev = None
 
-    def update_embed(self,member=discord.Member,player = None,original = None):
+    def update_embed(self,member=None,player = None,original = None):
         """Update the embed with the current song and player status."""
         self.embed = discord.Embed()
         self.embed.set_author(name=self.station)
-        self.embed.timestamp = self.startTime
         self.embed.set_thumbnail(url="attachment://"+self.thumbPick)
         self.embed.color = discord.Color.orange()
         if player is None:
+            print("Off Air 1")
             self.embed.title = "Off Air"
             self.embed.description = "No song is currently playing."
             self.embed.set_image(url=music_opts['off_url'])
         else:
             track = player.current
             if track:
+                print("Track",track)
+                if self.prev is None:
+                    self.prev = track.title
+                print("Prev:",self.prev)
+                if self.prev and self.prev != track.title:
+                    print("Prev:",self.prev,"Title:",track.title)
+                    print("Prev:",type(self.prev),"Title:",type(track.title))
+                    if self.requests.get(self.prev) is not None:
+                        del self.requests[self.prev]
+                    self.prev = track.title
                 requester = self.requests.get(track.title)
+                print(requester)
                 if requester is not None:
                     self.embed.set_footer(text="Requested by "+requester.display_name,icon_url=requester.avatar.url)
-                    del self.requests[track.title]
                 elif member is not None:
                     self.embed.set_footer(text="Requested by "+member.display_name,icon_url=member.avatar.url)
                 embedTitle = []
@@ -54,13 +65,13 @@ class MusicPlayerView(View):
                 if track.author:
                     embedTitle.append(track.author)
                 if len(embedTitle):
-                    self.embed.title = "Now Playing: "+' - '.join(embedTitle)
+                    self.embed.title = "Now Playing:\n"+' - '.join(embedTitle)
                 if track.artwork:
                     self.embed.set_image(url=track.artwork)
                 else:
                     self.embed.set_image(url=music_opts['missing_url'])
                 if original and original.recommended:
-                    self.embed.description += f"\n\n`This track was recommended via {track.source}`"
+                    self.embed.set_footer(text=f'This track was recommended via {track.source}')
 
                 if len(player.queue):
                     queue = []
@@ -72,11 +83,12 @@ class MusicPlayerView(View):
                         )
                     self.embed.add_field(name="Queue", value='\n'.join(queue), inline=False)
             else:
+                print("Off Air 2")
                 self.embed.title = "Off Air"
                 self.embed.description = "No song is currently playing."
                 self.embed.set_image(url=music_opts['off_url'])
 
-    @discord.ui.button(emoji="⏸️", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(emoji="⏯️", style=discord.ButtonStyle.blurple)
     async def toggle_pause(self, interaction: Interaction, button: Button):
         player: wavelink.Player = cast(wavelink.Player, interaction.guild.voice_client)
         if not player:
@@ -85,10 +97,6 @@ class MusicPlayerView(View):
                 await interaction.response.defer(thinking=False)
             return
         await player.pause(not player.paused)
-        if player.paused:
-            button.emoji = "▶️"
-        else:
-            button.emoji = "⏸️"
         await interaction.response.edit_message(embed=self.embed, view=self)
         if not interaction.response.is_done():
             await interaction.response.defer(thinking=False)
@@ -150,8 +158,64 @@ class MusicPlayerView(View):
         if not interaction.response.is_done():
             await interaction.response.defer(thinking=False)
 
-    
+    @discord.ui.button(emoji='🔁', style=discord.ButtonStyle.red)
+    async def loop(self, interaction: Interaction, button: Button):
+        player: wavelink.Player = cast(wavelink.Player, interaction.guild.voice_client)
+        if not player:
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=False)
+            return
+        if player.queue.mode == wavelink.QueueMode.normal:
+            print("NORMAL")
+            player.queue.mode = wavelink.QueueMode.loop_all
+            button.style = discord.ButtonStyle.green
+        else:
+            player.queue.mode = wavelink.QueueMode.normal
+            button.style = discord.ButtonStyle.red
 
+        self.update_embed(player=player)
+        thumbFile = discord.File('assets/'+self.thumbPick, filename= self.thumbPick )
+        await interaction.response.edit_message(embed=self.embed, view=self, attachments=[thumbFile])
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=False)
+    
+    @discord.ui.button(emoji='🔎', style=discord.ButtonStyle.red)
+    async def autoplay(self, interaction: Interaction, button: Button):
+        player: wavelink.Player = cast(wavelink.Player, interaction.guild.voice_client)
+        if not player:
+            if not interaction.response.is_done():
+                await interaction.response.defer(thinking=False)
+            return
+        if player.autoplay == wavelink.AutoPlayMode.enabled:
+            player.autoplay = wavelink.AutoPlayMode.partial
+            button.style = discord.ButtonStyle.red
+        else:
+            player.autoplay = wavelink.AutoPlayMode.enabled
+            button.style = discord.ButtonStyle.green
+
+        self.update_embed(player=player)
+        thumbFile = discord.File('assets/'+self.thumbPick, filename= self.thumbPick )
+        await interaction.response.edit_message(embed=self.embed, view=self, attachments=[thumbFile])
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=False)
+
+    @discord.ui.button(emoji='❔', style=discord.ButtonStyle.secondary)
+    async def musicHelp(self, interaction: Interaction, button: Button):
+        helpDescription = "YouTube music player."
+        helpButtons = {
+            "⏯️"     : "Pauses or resumes the current track.",
+            "⏭️"    : "Skips the current track",
+            "❌"    : "Closes the player and disconnects Hew from the voice channel.",
+            "🔉/🔊" : "Increases or decreases the player volume.",
+            "🔁"    : "Continuously loops through the current queue of tracks.\nExperimental feature. May not function perfectly.",
+            "🔎"     : "Searches for recommendations to play once the queue ends.\nExperimental feature. May not function perfectly."
+
+        }
+        helpEmbed = discord.Embed(color=discord.Color.blue(),title="Help",description=helpDescription)
+        helpEmbed.set_thumbnail(url=music_opts['info_url'])
+        for button,info in helpButtons.items():
+            helpEmbed.add_field(name=button, value=info, inline=True)
+        await interaction.response.send_message(embed=helpEmbed,ephemeral=True)
 
 class Music(commands.Cog,):
     def __init__(self, bot: commands.Bot) -> None:
@@ -213,16 +277,24 @@ class Music(commands.Cog,):
             await player.queue.put_wait(track)
             await interaction.response.send_message(f"Added **`{track}`** to the queue.",ephemeral=True)
             view.requests[track.title] = member
-        if not player.playing:
+        if player.playing:
+            view.update_embed(player=player,original = None)
+            thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
+            if view.player_message:
+                await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])
+            else:
+                player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
+                view.player_message = player_message
+        else:
             # Play now since we aren't playing anything...
             await player.play(player.queue.get(), volume=30)
-        view.update_embed(member=member,player=player)
-        thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
-        if view.player_message:
-            await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])
-        else:
-            player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
-            view.player_message = player_message
+        #view.update_embed(member=member,player=player)
+        #thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
+        #if view.player_message:
+            #await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])
+        #else:
+            #player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
+            #view.player_message = player_message
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Music(bot))

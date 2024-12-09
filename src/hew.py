@@ -11,6 +11,14 @@ import logging
 import json
 import wavelink
 
+
+
+'''
+To Do:
+Turning on auto play while on dead air should immediately find a song
+Once the queue gets so long, append ...x more to keep length reasonable.
+'''
+
 with open('./config.json', 'r') as config_file:
     config = json.load(config_file)
 
@@ -54,6 +62,32 @@ class Bot(commands.Bot):
         if view is None:
             print("ERR - No Guild ID!",dir(player))
         view.update_embed(player=player,original = original)
+        thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
+        if view.player_message:
+            await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])
+        else:
+            player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
+            view.player_message = player_message
+
+    async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload) -> None:
+        player: wavelink.Player | None = payload.player
+        if not player:
+            print("No player - track end event")
+            return
+        print("Queue",str(player.queue))
+        print("Current",player.current)
+        if len(player.queue) == 0 and player.current is None and player.autoplay != wavelink.AutoPlayMode.enabled:
+            view = self.playerSessions.get(player.guild.id)
+            if view is None:
+                print("ERR - No Guild ID! - track end event",dir(player))
+                return
+            view.update_embed(player=player,original = None)
+            thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
+            if view.player_message:
+                await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])
+            else:
+                player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
+                view.player_message = player_message
 
 
     async def load_extensions(self):
