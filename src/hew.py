@@ -10,13 +10,14 @@ from discord.ext import commands
 import logging
 import json
 import wavelink
-
+import time
 
 
 '''
 To Do:
 Turning on auto play while on dead air should immediately find a song
 Once the queue gets so long, append ...x more to keep length reasonable.
+Back button since the player keeps a history.
 '''
 
 with open('./config.json', 'r') as config_file:
@@ -51,6 +52,30 @@ class Bot(commands.Bot):
     async def on_wavelink_node_ready(self, payload: wavelink.NodeReadyEventPayload) -> None:
         print("Wavelink Node connected: %r | Resumed: %s", payload.node, payload.resumed)
 
+    async def on_wavelink_inactive_player(self, player: wavelink.Player) -> None:
+        print("Inactive player!")
+        await asyncio.sleep(2)
+        home = player.home
+        if self.playerSessions.get(home.guild.id):
+            view = self.playerSessions[home.guild.id]
+            view.finish_embed()
+            thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
+            view.clear_items()
+            if view.player_message:
+                await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])       
+            view.stop()
+            del self.playerSessions[home.guild.id]
+        await player.disconnect()
+        print("Disconnected")            
+
+    #Need proper handling of this at some point
+    async def on_wavelink_track_stuck(self, payload: wavelink.TrackStuckEventPayload) -> None:
+        player: wavelink.Player | None = payload.player
+        track: wavelink.Playable = payload.track
+        print("STUCK")
+        print(player)
+        print(track)
+
     async def on_wavelink_track_start(self, payload: wavelink.TrackStartEventPayload) -> None:
         player: wavelink.Player | None = payload.player
         original: wavelink.Playable | None = payload.original
@@ -61,12 +86,14 @@ class Bot(commands.Bot):
         view = self.playerSessions.get(player.guild.id)
         if view is None:
             print("ERR - No Guild ID!",dir(player))
+            return
         view.update_embed(player=player,original = original)
         thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
         if view.player_message:
             await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])
         else:
             player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
+            print("New player - Track start",player_message)
             view.player_message = player_message
 
     async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload) -> None:
@@ -81,13 +108,15 @@ class Bot(commands.Bot):
             if view is None:
                 print("ERR - No Guild ID! - track end event",dir(player))
                 return
+            view.offlineTime = time.time()
             view.update_embed(player=player,original = None)
             thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
             if view.player_message:
                 await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])
-            else:
-                player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
-                view.player_message = player_message
+            #else:
+                #player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
+                #print("New player - Track end",player_message)
+                #view.player_message = player_message
 
 
     async def load_extensions(self):

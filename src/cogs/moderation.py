@@ -24,24 +24,6 @@ class Moderation(commands.Cog):
             raise error
 
     @commands.command()
-    async def clearmess(self,ctx, amount=5):
-        channel = ctx.message.channel
-        await channel.purge(limit=int(amount) + 1)
-        await ctx.send(f"All set, deleted {amount} messages")
-
-    @commands.command()
-    async def report(self,ctx,*,content):
-        if ctx.channel.type is discord.ChannelType.private:
-            adminChat = self.bot.get_channel(772305372416311327)
-            await adminChat.send(f'<@&732693073649467403>\nReport filed:\n{content}')
-
-    @commands.command()
-    async def copy(self,ctx,limit = None):
-        messages = await ctx.channel.history(limit=limit).flatten()
-        with open("channel_messages.txt", "a+", encoding="utf-8") as f:
-            print(*messages, sep="\n\n<|endoftext|>\n\n", file=f)
-
-    @commands.command()
     @commands.guild_only()
     @commands.is_owner()
     async def sync(self,ctx: commands.Context, guilds: commands.Greedy[discord.Object], spec: Optional[Literal["~", "*", "^"]] = None) -> None:
@@ -102,11 +84,18 @@ class Moderation(commands.Cog):
         embed.title = "Hew - Version "+config['version']
         embed.add_field(name="Uptime", value=datetime.datetime.now() - self.bot.start_time, inline=False)
         embed.add_field(name="Cogs", value='\n'.join(self.bot.loadedCogs), inline=True)
-        embed.add_field(name="Relay Node", value=f"ID: {self.bot.playerNode.identifier}\nStatus: {self.bot.playerNode.status}\nActive Players: {len(self.bot.playerNode.players)}",inline=True)
-        sessions = ""
+        embed.add_field(name="Relay Node", value=f"ID: {self.bot.playerNode.identifier}\nStatus: {self.bot.playerNode.status.name}\nActive Players: {len(self.bot.playerNode.players)}",inline=True)
+        count=0
         for k,v in self.bot.playerSessions.items():
-            sessions+=f'Guild {k} - View ID:{v.id} - View Message:{v.player_message}\n'
-        embed.add_field(name="Sessions", value=sessions, inline=False)
+            count += 1
+            sessions = ""
+            guild = self.bot.get_guild(k)
+            sessions+=f'Guild: {k}/{guild.name} - View: {v.id} - mID: {v.player_message.id}\nStartTime: {v.startTime}\n'
+            if guild.voice_client:
+                player: wavelink.Player = cast(wavelink.Player, guild.voice_client)
+                if player:
+                    sessions+=f'{player.autoplay}\n{player.queue.mode}'
+            embed.add_field(name=f"Session {count}", value=sessions, inline=False)
         await ctx.send(embed=embed)
 
 
