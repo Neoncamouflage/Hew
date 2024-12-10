@@ -6,7 +6,7 @@ from typing import cast
 from typing import Literal, Optional
 from discord.ext import commands
 import datetime
-import wavelink
+import wavelink # type: ignore
 with open('./config.json', 'r') as config_file:
     config = json.load(config_file)
 
@@ -82,8 +82,23 @@ class Moderation(commands.Cog):
     async def status(self,ctx):
         embed = discord.Embed()
         embed.title = "Hew - Version "+config['version']
-        embed.add_field(name="Uptime", value=datetime.datetime.now() - self.bot.start_time, inline=False)
+        elapsed_time = datetime.datetime.now() - self.bot.start_time
+        days = elapsed_time.days
+        hours, remainder = divmod(elapsed_time.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if days > 0:
+            formatted_time = f"{days}d {hours}h {minutes}m {seconds}s"
+        elif hours > 0:
+            formatted_time = f"{hours}h {minutes}m {seconds}s"
+        elif minutes > 0:
+            formatted_time = f"{minutes}m {seconds}s"
+        else:
+            formatted_time = f"{seconds}s"
+        
+        
+        embed.add_field(name="Guilds", value='\n'.join([str(a.id) for a in self.bot.guilds]), inline=True)
         embed.add_field(name="Cogs", value='\n'.join(self.bot.loadedCogs), inline=True)
+        embed.add_field(name="Uptime", value=formatted_time, inline=True)
         embed.add_field(name="Relay Node", value=f"ID: {self.bot.playerNode.identifier}\nStatus: {self.bot.playerNode.status.name}\nActive Players: {len(self.bot.playerNode.players)}",inline=True)
         count=0
         for k,v in self.bot.playerSessions.items():

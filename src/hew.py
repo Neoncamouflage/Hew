@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 import logging
 import json
-import wavelink
+import wavelink # type: ignore
 import time
 
 
@@ -91,6 +91,7 @@ class Bot(commands.Bot):
         thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
         if view.player_message:
             await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])
+            print('\nVolume:',view.volume)
         else:
             player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
             print("New player - Track start",player_message)

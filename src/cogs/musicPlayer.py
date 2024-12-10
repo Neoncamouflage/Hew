@@ -10,7 +10,7 @@ from discord.ui import View, Button
 from discord import Embed, Interaction
 from datetime import datetime, timezone
 import uuid
-import wavelink
+import wavelink # type: ignore
 import time
 with open('./opts.json', 'r') as opts_file:
     music_opts = json.load(opts_file)
@@ -18,11 +18,13 @@ with open('./opts.json', 'r') as opts_file:
 class MusicPlayerView(View):
     def __init__(self, bot: commands.Bot, embed: Embed):
         super().__init__(timeout=None)
+        self.volume = 30
         self.bot = bot
         self.embed = embed
         self.startTime = datetime.now(timezone.utc)
         self.id = str(uuid.uuid4())[:8]
         self.player_message = None
+        self.offlineTime = None
         self.thumbPick = random.choice(music_opts['thumb_images'])
         self.station = random.choice(music_opts['names'])
         self.requests = {}
@@ -164,7 +166,8 @@ class MusicPlayerView(View):
             if not interaction.response.is_done():
                 await interaction.response.send_message("No active player.", ephemeral=True)
             return
-        await player.set_volume(player.volume-20)
+        self.volume = max(self.volume - 20,10)
+        await player.set_volume(self.volume)
         if not interaction.response.is_done():
             await interaction.response.defer(thinking=False)
     @discord.ui.button(emoji='🔊', style=discord.ButtonStyle.secondary)
@@ -175,7 +178,8 @@ class MusicPlayerView(View):
             if not interaction.response.is_done():
                 await interaction.response.send_message("No active player.", ephemeral=True)
             return
-        await player.set_volume(player.volume+20)
+        self.volume = min(self.volume + 20,1000)
+        await player.set_volume(self.volume)
         if not interaction.response.is_done():
             await interaction.response.defer(thinking=False)
 
@@ -311,15 +315,17 @@ class Music(commands.Cog,):
         if not tracks:
             await interaction.response.send_message(f"{interaction.user.mention} - No search results for that, sorry.",ephemeral=True)
             return
+        m1 = False
+        m2 = False
 
         if isinstance(tracks, wavelink.Playlist):
             # tracks is a playlist...
             added: int = await player.queue.put_wait(tracks)
-            await interaction.response.send_message(f"Added the playlist **`{tracks.name}`** ({added} songs) to the queue.",ephemeral=True)
+            m1 = True
         else:
             track: wavelink.Playable = tracks[0]
             await player.queue.put_wait(track)
-            await interaction.response.send_message(f"Added **`{track}`** to the queue.",ephemeral=True)
+            m2 = True
             view.requests[track.title] = member
         if player.playing:
             view.update_embed(player=player,original = None)
@@ -331,7 +337,12 @@ class Music(commands.Cog,):
                 print("New player - Play Command",player_message)
                 view.player_message = player_message
         else:
-            await player.play(player.queue.get(), volume=30)
+            await player.play(player.queue.get(), volume=view.volume)
+        if m1:
+            await interaction.response.send_message(f"Added the playlist **`{tracks.name}`** ({added} songs) to the queue.",ephemeral=True)
+        if m2:
+            await interaction.response.send_message(f"Added **`{track}`** to the queue.",ephemeral=True)
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Music(bot))
