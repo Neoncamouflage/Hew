@@ -35,6 +35,7 @@ class Bot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix=get_prefix, description="A DnD flavored Discord bot",intents=intents, activity = discord.Game(name="Dungeons and Dragons"), help_command=None)
         self.loadedCogs = []
+        self.unloadedCogs = []
         self.playerSessions = {}
 
     async def setup_hook(self) -> None:
@@ -123,8 +124,11 @@ class Bot(commands.Bot):
     async def load_extensions(self):
         for filename in os.listdir(".\\cogs"):
             if filename.endswith(".py"):
-                await self.load_extension(f"cogs.{filename[:-3]}")
-                self.loadedCogs.append(filename)
+                try:
+                    await self.load_extension(f"cogs.{filename[:-3]}")
+                    self.loadedCogs.append(filename)
+                except Exception as e:
+                    self.unloadedCogs.append(filename)
 
 
 bot = Bot()

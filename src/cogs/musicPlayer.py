@@ -311,37 +311,42 @@ class Music(commands.Cog,):
         # Seed the doc strings for more information on this method...
         # If spotify is enabled via LavaSrc, this will automatically fetch Spotify tracks if you pass a URL...
         # Defaults to YouTube for non URL based queries...
-        tracks: wavelink.Search = await wavelink.Playable.search(song)
-        if not tracks:
-            await interaction.response.send_message(f"{interaction.user.mention} - No search results for that, sorry.",ephemeral=True)
-            return
-        m1 = False
-        m2 = False
-
-        if isinstance(tracks, wavelink.Playlist):
-            # tracks is a playlist...
-            added: int = await player.queue.put_wait(tracks)
-            m1 = True
-        else:
-            track: wavelink.Playable = tracks[0]
-            await player.queue.put_wait(track)
-            m2 = True
-            view.requests[track.title] = member
-        if player.playing:
-            view.update_embed(player=player,original = None)
-            thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
-            if view.player_message:
-                await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])
+        try:
+            tracks: wavelink.Search = await wavelink.Playable.search(song)
+            if not tracks:
+                await interaction.response.send_message(f"{interaction.user.mention} - No search results for that, sorry.",ephemeral=True)
+                return
+            m1 = False
+            m2 = False
+        
+            if isinstance(tracks, wavelink.Playlist):
+                # tracks is a playlist...
+                added: int = await player.queue.put_wait(tracks)
+                m1 = True
             else:
-                player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
-                print("New player - Play Command",player_message)
-                view.player_message = player_message
-        else:
-            await player.play(player.queue.get(), volume=view.volume)
-        if m1:
-            await interaction.response.send_message(f"Added the playlist **`{tracks.name}`** ({added} songs) to the queue.",ephemeral=True)
-        if m2:
-            await interaction.response.send_message(f"Added **`{track}`** to the queue.",ephemeral=True)
+                track: wavelink.Playable = tracks[0]
+                await player.queue.put_wait(track)
+                m2 = True
+                view.requests[track.title] = member
+            if player.playing:
+                view.update_embed(player=player,original = None)
+                thumbFile = discord.File('assets/'+view.thumbPick, filename= view.thumbPick )
+                if view.player_message:
+                    await view.player_message.edit(embed=view.embed, view=view, attachments=[thumbFile])
+                else:
+                    player_message = await player.home.send(embed=view.embed, view=view, file=thumbFile)
+                    print("New player - Play Command",player_message)
+                    view.player_message = player_message
+            else:
+                await player.play(player.queue.get(), volume=view.volume)
+            if m1:
+                await interaction.response.send_message(f"Added the playlist **`{tracks.name}`** ({added} songs) to the queue.",ephemeral=True)
+            if m2:
+                await interaction.response.send_message(f"Added **`{track}`** to the queue.",ephemeral=True)
+        except wavelink.exceptions.LavalinkLoadException as e:
+            await interaction.response.send_message(f"Failed to Load Tracks. The media relay server likely requires an update, please inform Neoncamouflage.\nError: {e.error}\nSeverity: {e.severity}\nCause: {e.cause}")
+
+
 
 
 async def setup(bot: commands.Bot) -> None:
