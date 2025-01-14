@@ -15,6 +15,7 @@ import time
 
 '''
 To Do:
+Fully set up logging
 Turning on auto play while on dead air should immediately find a song
 Once the queue gets so long, append ...x more to keep length reasonable.
 Back button since the player keeps a history.
@@ -30,6 +31,7 @@ def get_prefix(bot, message):
 discord.utils.setup_logging()
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.all()
+
 
 class Bot(commands.Bot):
     def __init__(self):
