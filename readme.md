@@ -10,7 +10,7 @@ Install Hew [here](https://discord.com/oauth2/authorize?client_id=70007951555638
 
 ## Features
 
-- Music Player
+- Music Player **Updated**
 - DnD SRD Lookup
 - OpenAI Powered Chat Interaction
 - Multiple utility functions such as dice rolling and organizing a group into teams
