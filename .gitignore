@@ -7,5 +7,6 @@
 !assets/
 
 !*.py
+!requirements.txt
 
 *test*.py
